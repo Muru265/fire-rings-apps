@@ -12,7 +12,7 @@ export default function Insurance() {
   const [p, setP] = useState(90)
   const s = useGet<Series>(fr(`/data/v1/api/series/${region}.json`))
   return (
-    <AppPage id="insurance" title="Fire index for insurance" who="For insurers and disaster funds (parametric, Floodbase-style)"
+    <AppPage id="insurance" title="Fire index for insurance" who="For insurers and disaster funds · parametric index (pays on a measured index, not on loss)"
       decision="Which months would have paid out under a simple “fire-days above the usual” trigger — and would the satellite switch in 2012 have triggered false payouts?"
       limit="Illustrative index only, not an insurance product. Area-level (~36 km² cells), satellite heat detections — heat ≠ damage. Trigger = month above the chosen percentile of the same calendar month in 2003–2022."
       open={`/r/${region}`}>
