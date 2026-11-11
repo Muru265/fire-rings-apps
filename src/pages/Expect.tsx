@@ -1,7 +1,45 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { AppPage } from '../components/Shell'
-import { MONTHS, fmt, fr, useGet } from '../lib/api'
+import type { Hero } from '../components/Shell'
+import { CalendarFlame } from '../components/Icons'
+import { MONTHS, REGIONS, fmt, fr, useGet } from '../lib/api'
 import RegionPick from '../components/RegionPick'
+
+const FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+/** #90 hero wording (all values from api/projection/{region}.json):
+ *  - The projection is used only when the backtest says it beat "typical" at today's checkpoint (current.better === 'projection').
+ *    Then: "{Month} in {Region}: quieter than usual | about usual | busier than usual." using the published usual range:
+ *      projection < P10 of the 2003–2022 baseline → "quieter than usual"; projection > P90 → "busier than usual"; else "about usual".
+ *    Supporting: "About {N} fire-days expected (range {a}–{b}) · tested on {n_years} years."
+ *  - Otherwise (too early / too little fire): "Typical for {Month} in {Region}: {N} fire-days." — no class is claimed. */
+function expectHero(d: Proj, region: string): Hero | null {
+  const name = REGIONS.find((r) => r.id === region)?.name ?? d.name
+  const c = d.current
+  if (!c) {
+    const n = d.next_month
+    return n ? { answer: <>Typical for {FULL[n.m - 1]} in {name}: <span className="num">{fmt(n.typical)}</span> fire-days.</>, support: <>Usual range {fmt(n.p10)}–{fmt(n.p90)} fire-days ({d.baseline[0]}–{d.baseline[1]}).</> } : null
+  }
+  const mo = d.months[c.m - 1]
+  const cp = mo?.checkpoints.find((x) => x.day === c.checkpoint) ?? null
+  const useProj = c.better === 'projection' && c.projection != null
+  const chips: [string, ReactNode][] = [[`Typical ${MONTHS[c.m - 1]}`, fmt(c.typical)], [`So far (day ${c.days})`, fmt(c.so_far)]]
+  if (useProj) {
+    const cls = c.p10 != null && c.projection! < c.p10 ? 'quieter than usual' : c.p90 != null && c.projection! > c.p90 ? 'busier than usual' : 'about usual'
+    if (cp) chips.push(['Past error', `±${Math.round(cp.mdape_projection)}% vs ±${Math.round(cp.mdape_typical)}% typical`])
+    return {
+      answer: <>{FULL[c.m - 1]} in {name}: {cls}.</>,
+      support: <>About <span className="num" data-testid="hero-n">{fmt(c.projection)}</span> fire-days expected{c.range ? <> (range <span className="num">{fmt(c.range[0])}–{fmt(c.range[1])}</span>)</> : ''} · tested on {cp?.n_years ?? 20} years.</>,
+      chips,
+    }
+  }
+  return {
+    answer: <>Typical for {FULL[c.m - 1]} in {name}: <span className="num" data-testid="hero-n">{fmt(c.typical)}</span> fire-days.</>,
+    support: <>{c.reason === 'too little fire to project' ? 'Too little fire to project' : 'Too early in the month to project'}; usual range {fmt(c.p10)}–{fmt(c.p90)}.</>,
+    chips: [[`So far (day ${c.days})`, fmt(c.so_far)], ...(d.next_month ? [[`Typical ${MONTHS[d.next_month.m - 1]}`, fmt(d.next_month.typical)] as [string, string]] : [])],
+  }
+}
 
 interface Checkpoint { day: number; n_years: number; mdape_projection: number; mdape_typical: number; better: 'projection' | 'typical'; range_factor: [number, number] | null }
 interface Proj {
@@ -18,10 +56,8 @@ export default function Expect() {
     <AppPage id="expect" title="What to expect this month" who="For land managers and firefighters"
       decision="How busy will the rest of this month be, and what is normal for next month — for rosters, patrols and equipment."
       limit="Projection from the month so far and 20 years of history — not a weather-based forecast. Values are satellite fire-days (MODIS-equivalent, ~36 km² cells), not burned area."
-      open={`/r/${region}`}>
-      <RegionPick value={region} onChange={setRegion} />
-      {p.status === 'loading' && <div className="card muted">Loading from Fire Rings…</div>}
-      {p.status === 'error' && <div className="card bad">Could not load: {p.error}</div>}
+      open={`/r/${region}`} icon={<CalendarFlame />} picker={<RegionPick value={region} onChange={setRegion} />}
+      hero={p.status === 'ready' ? expectHero(p.data, region) : null} error={p.status === 'error' ? p.error : null}>
       {p.status === 'ready' && <Body d={p.data} />}
     </AppPage>
   )

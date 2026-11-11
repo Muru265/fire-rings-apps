@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
 import { AppPage } from '../components/Shell'
+import type { Hero } from '../components/Shell'
+import { Volcano as VolcanoIcon } from '../components/Icons'
 import { EMBED, fmt, fr, useGet } from '../lib/api'
 
 interface SensorRec { detected: boolean; first_detection: string | null; lag_days: number | null; detections: number; volcano_flagged: number; detection_days: number; pre30_detections: number | null }
@@ -13,15 +15,31 @@ interface Reunion {
   series: Record<'modis' | 'viirs', { detections: (number | null)[]; available: [string, string] }>
 }
 
+/** #90 hero wording (values from api/reunion.json, MODIS = the long record since 2000):
+ *  "The satellites saw {detected} of {eruptions_in_period} eruptions — {timing}."
+ *  timing: every detected eruption first seen on its GVP start day (lag ≤ 0) → "on the first day";
+ *          at least half → "most on the first day"; otherwise "first seen a median {n} days after the start".
+ *  Chip "VIIRS: {d} of {n}". Detection only — never presented as prediction. */
+function volcanoHero(d: Reunion): Hero {
+  const s = d.summary
+  const lags = d.eruptions.map((e) => e.sensors.modis).filter((m): m is SensorRec => !!m && m.detected && m.lag_days != null).map((m) => m.lag_days!)
+  const first = lags.filter((l) => l <= 0).length
+  const timing = lags.length && first === lags.length ? 'on the first day' : first * 2 >= lags.length ? 'most on the first day' : `first seen a median ${s.modis.median_lag_days} days after the start`
+  return {
+    answer: <>The satellites saw <span className="num" data-testid="hero-x">{s.modis.detected}</span> of <span className="num" data-testid="hero-y">{s.modis.eruptions_in_period}</span> eruptions — {timing}.</>,
+    support: <>MODIS since 2000 · Piton de la Fournaise, Réunion. Eruption dates: Smithsonian Global Volcanism Program. Detection, not prediction.</>,
+    chips: [['VIIRS:', `${s.viirs.detected} of ${s.viirs.eruptions_in_period}`], ['Median first-detection lag', `${s.modis.median_lag_days ?? '—'} d · ${s.viirs.median_lag_days ?? '—'} d`]],
+  }
+}
+
 export default function Volcano() {
   const d = useGet<Reunion>(fr('/data/v1/api/reunion.json'))
   return (
     <AppPage id="volcano" title="Volcano ground-truth check · Piton de la Fournaise" who="For volcano observatories and scientists"
       decision="Do the fire satellites see every eruption of Réunion’s volcano, how fast, and do old and new sensors agree once put on one scale?"
       limit="Not an eruption forecast. Eruption dates come from the Smithsonian Global Volcanism Program; each eruption links to its source. Satellite detections are heat at overpass times only."
-      open="/proof">
-      {d.status === 'loading' && <div className="card muted">Loading from Fire Rings…</div>}
-      {d.status === 'error' && <div className="card warn" data-testid="volcano-pending">The Réunion series is not published yet (eruption list pending). {d.error}</div>}
+      open="/proof" icon={<VolcanoIcon />} credit="Eruption dates: Smithsonian Global Volcanism Program"
+      hero={d.status === 'ready' ? volcanoHero(d.data) : null} error={d.status === 'error' ? `the Réunion series is not published yet: ${d.error}` : null}>
       {d.status === 'ready' && <Body d={d.data} />}
     </AppPage>
   )

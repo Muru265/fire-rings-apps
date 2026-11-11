@@ -2,6 +2,8 @@ import { cellToBoundary } from 'h3-js'
 import { useMemo, useState } from 'react'
 import Bars from '../components/Bars'
 import { AppPage } from '../components/Shell'
+import type { Hero } from '../components/Shell'
+import { HazeCloud } from '../components/Icons'
 import { EMBED, MONTHS, fmt, fr, get, ord, useGet } from '../lib/api'
 import type { RegionDoc } from '../lib/api'
 import { useEffect } from 'react'
@@ -17,28 +19,51 @@ export default function Smoke() {
     <AppPage id="smoke" title="Smoke-season tracker · Punjab–Haryana" who="For air-quality and health teams"
       decision="How big is this October–November crop-burning season compared with the past 25, and where were the fires?"
       limit="Shows detected fire and a NASA aerosol layer side by side — a visual link only. No claims about smoke exposure or health. Fire-days are MODIS-equivalent; recent seasons may be undercounted (detection-time caveat)."
-      open="/r/punjab?from=2025-10&to=2025-11">
+      open="/r/punjab?from=2025-10&to=2025-11" icon={<HazeCloud />} credit="Imagery: NASA GIBS / Worldview (MERRA-2)"
+      hero={doc.status === 'ready' ? smokeHero(doc.data) : null} error={doc.status === 'error' ? doc.error : null}>
       {doc.status === 'ready' && <Body doc={doc.data} />}
-      {doc.status === 'loading' && <div className="card muted">Loading from Fire Rings…</div>}
-      {doc.status === 'error' && <div className="card bad">Could not load: {doc.error}</div>}
     </AppPage>
   )
 }
 
-function Body({ doc }: { doc: RegionDoc }) {
-  const seasons = useMemo(() => {
+function smokeOf(doc: RegionDoc) {
+  const seasons = (() => {
     const ys = [...new Set(doc.months.map((m) => m.y))]
     return ys.map((y) => {
       const o = doc.months.find((x) => x.y === y && x.m === 10), n = doc.months.find((x) => x.y === y && x.m === 11)
       const complete = !!(o?.H != null && n?.H != null && !n.flags.includes('mtd') && o.src !== 'T')
       return { y, total: o?.H != null && n?.H != null ? o.H + n.H : o?.H ?? null, complete, partial: !!n?.flags.includes('mtd') || n?.H == null }
     }).filter((s) => s.total != null)
-  }, [doc])
+  })()
   const full = seasons.filter((s) => s.complete)
   const last = full[full.length - 1]
   const rank = last ? 1 + full.filter((s) => s.total! > last.total!).length : null
   const s21 = full.find((s) => s.y === 2021)
   const cur = seasons[seasons.length - 1]
+  return { seasons, full, last, rank, s21, cur }
+}
+
+/** #90 hero wording (values from regions/punjab.json, Oct + Nov fire-days):
+ *  "Oct–Nov {Y}: {phrase} burning season in {N} years*" — N = complete seasons; phrase = "the biggest" (rank 1),
+ *  "the smallest" (last), otherwise "the {k}th-biggest". The asterisk line right under it is the published caveat
+ *  (caveats.overpass_timing). Chips: this season · change since 2021 · current season so far. */
+function smokeHero(doc: RegionDoc): Hero | null {
+  const { full, last, rank, s21, cur } = smokeOf(doc)
+  if (!last || !rank) return null
+  const phrase = rank === 1 ? 'the biggest' : rank === full.length ? 'the smallest' : `the ${ord(rank)}-biggest`
+  const chips: [string, string][] = [[`Oct–Nov ${last.y}`, `${fmt(last.total)} fire-days`]]
+  if (s21 && last.y > 2021) chips.push(['Since 2021', `${Math.round((last.total! / s21.total! - 1) * 100)}%`])
+  if (cur && !cur.complete) chips.push([`${cur.y} so far`, `${fmt(cur.total)} fire-days`])
+  return {
+    answer: <>Oct–Nov {last.y}: {phrase} burning season in <span className="num" data-testid="hero-n">{full.length}</span> years*</>,
+    extra: doc.caveats?.overpass_timing ? <p className="small" style={{ marginTop: 6, color: 'var(--warn)' }} data-testid="smoke-caveat">*{doc.caveats.overpass_timing}</p> : undefined,
+    support: <>Punjab–Haryana crop-residue burning, satellite fire-days (MODIS-equivalent).</>,
+    chips,
+  }
+}
+
+function Body({ doc }: { doc: RegionDoc }) {
+  const { seasons, full, last, rank, s21, cur } = useMemo(() => smokeOf(doc), [doc])
   return (
     <>
       <section className="card" data-testid="smoke-headline">

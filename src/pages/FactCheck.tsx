@@ -3,6 +3,8 @@ import Bars from '../components/Bars'
 import type { Bar } from '../components/Bars'
 import RegionPick from '../components/RegionPick'
 import { AppPage } from '../components/Shell'
+import type { Hero } from '../components/Shell'
+import { Magnifier } from '../components/Icons'
 import { MONTHS, REGIONS, fmt, fmt1, fr, gapReason, median, ord, useGet } from '../lib/api'
 import type { RegionDoc } from '../lib/api'
 
@@ -22,9 +24,10 @@ export default function FactCheck() {
     <AppPage id="factcheck" title="Fact-check a season" who="For journalists and scientists"
       decision="Was this season really the worst on record? How did the rain and heat beforehand compare with normal?"
       limit="States what the data show — rank among complete seasons and weather vs normal. It does not say the weather caused the fires. Built on Fire Rings + NASA POWER."
-      open={`/r/${region}?from=${year}-${String(start).padStart(2, '0')}&to=${ym(key(year, start) + len - 1).y}-${String(ym(key(year, start) + len - 1).m).padStart(2, '0')}`}>
+      open={`/r/${region}?from=${year}-${String(start).padStart(2, '0')}&to=${ym(key(year, start) + len - 1).y}-${String(ym(key(year, start) + len - 1).m).padStart(2, '0')}`}
+      icon={<Magnifier />} picker={<RegionPick value={region} onChange={setRegion} />} credit="Weather: NASA POWER"
+      hero={doc.status === 'ready' ? factHero(doc.data, pow.status === 'ready' ? pow.data : null, start, len, year) : null} error={doc.status === 'error' ? doc.error : null}>
       <div className="card row">
-        <RegionPick value={region} onChange={setRegion} />
         <label className="f">Season starts
           <select value={start} onChange={(e) => setStart(Number(e.target.value))} data-testid="fc-start">{MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}</select></label>
         <label className="f">Length (months)
@@ -33,14 +36,11 @@ export default function FactCheck() {
           <input type="number" value={year} min={2003} max={2026} onChange={(e) => setYear(Number(e.target.value))} data-testid="fc-year" /></label>
       </div>
       {doc.status === 'ready' && <Result doc={doc.data} pow={pow.status === 'ready' ? pow.data : null} start={start} len={len} year={year} />}
-      {doc.status === 'loading' && <div className="card muted">Loading from Fire Rings…</div>}
-      {doc.status === 'error' && <div className="card bad">Could not load: {doc.error}</div>}
     </AppPage>
   )
 }
 
-function Result({ doc, pow, start, len, year }: { doc: RegionDoc; pow: Power | null; start: number; len: number; year: number }) {
-  const r = useMemo(() => {
+function seasonsOf(doc: RegionDoc, start: number, len: number, year: number) {
     const by = new Map(doc.months.map((x) => [key(x.y, x.m), x]))
     const ok = (k: number) => { const x = by.get(k); return !!x && x.H != null && x.src !== 'T' && !x.flags.includes('mtd') && !x.flags.includes('insufficient') }
     const seasons: { y: number; total: number; lo: number; hi: number }[] = []
@@ -59,8 +59,9 @@ function Result({ doc, pow, start, len, year }: { doc: RegionDoc; pow: Power | n
     const mine = seasons.find((s) => s.y === year) ?? null
     const rank = mine ? 1 + seasons.filter((s) => s.total > mine.total).length : null
     return { seasons, mine, rank, gaps }
-  }, [doc, start, len, year])
-  const w = useMemo(() => {
+}
+
+function weatherOf(pow: Power | null, start: number, year: number) {
     if (!pow) return null
     const pm = new Map(pow.months.map(([y, m, rain, t]) => [key(y, m), { rain, t }]))
     const k0 = key(year, start)
@@ -74,7 +75,32 @@ function Result({ doc, pow, start, len, year }: { doc: RegionDoc; pow: Power | n
       if (ks.every((k) => pm.has(k))) base.push({ rain: ks.reduce((a, k) => a + pm.get(k)!.rain, 0), t: ks.reduce((a, k) => a + pm.get(k)!.t, 0) / PRE })
     }
     return { pre, rain, t, rainMed: median(base.map((b) => b.rain)), tMed: median(base.map((b) => b.t)), n: base.length }
-  }, [pow, start, year])
+}
+
+/** #90 hero wording (values from regions/{id}.json + api/power/{id}.json):
+ *  claim  "Was {season} {Region}'s worst season on record?"
+ *  stamp  rank 1 → "TRUE — 1st of {M} seasons"; otherwise "NOT QUITE — ranked {k} of {M}" (M = complete seasons; rank by fire-days).
+ *  support: NASA POWER rain (% of the 2003–2022 median) and mean temperature for the 3 months before, then
+ *           "Does not show the weather caused the fires." */
+function factHero(doc: RegionDoc, pow: Power | null, start: number, len: number, year: number): Hero {
+  const r = seasonsOf(doc, start, len, year)
+  const w = weatherOf(pow, start, year)
+  const k1 = key(year, start) + len - 1
+  const label = `${MONTHS[start - 1]} ${year}${len > 1 ? ` – ${MONTHS[ym(k1).m - 1]} ${ym(k1).y}` : ''}`
+  const name = REGIONS.find((x) => x.id === doc.id)?.name ?? doc.name
+  if (!r.mine || !r.rank) return { answer: <>No complete data yet for {label} in {name}.</>, support: 'Pick an earlier season under “Show the data”.' }
+  const M = r.seasons.length
+  return {
+    answer: <>Was {label} {name}’s worst season on record?</>,
+    extra: <p className={`stamp ${r.rank === 1 ? 'true' : 'notquite'}`} data-testid="fc-stamp">{r.rank === 1 ? <>True — 1st of {M} seasons</> : <>Not quite — ranked {r.rank} of {M}</>}</p>,
+    support: <>{w ? <>Rain in the 3 months before: <span className="num">{Math.round((w.rain / w.rainMed) * 100)}%</span> of normal; <span className="num">{fmt1(w.t)} °C</span> vs <span className="num">{fmt1(w.tMed)} °C</span> usual. </> : ''}Does not show the weather caused the fires.</>,
+    chips: [['This season', `${fmt(r.mine.total)} fire-days`], ['Compared with', `${M} seasons, ${r.seasons[0].y}–${r.seasons[M - 1].y}`]],
+  }
+}
+
+function Result({ doc, pow, start, len, year }: { doc: RegionDoc; pow: Power | null; start: number; len: number; year: number }) {
+  const r = useMemo(() => seasonsOf(doc, start, len, year), [doc, start, len, year])
+  const w = useMemo(() => weatherOf(pow, start, year), [pow, start, year])
   const k0 = key(year, start), k1 = k0 + len - 1
   const label = `${MONTHS[start - 1]} ${year}${len > 1 ? ` – ${MONTHS[ym(k1).m - 1]} ${ym(k1).y}` : ''}`
   const name = REGIONS.find((x) => x.id === doc.id)?.name ?? doc.name

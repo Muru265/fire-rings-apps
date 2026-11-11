@@ -1,8 +1,10 @@
 import { cellToLatLng } from 'h3-js'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Bars from '../components/Bars'
 import RegionPick from '../components/RegionPick'
 import { AppPage } from '../components/Shell'
+import type { Hero } from '../components/Shell'
+import { TrafficLight } from '../components/Icons'
 import { EMBED, REGIONS, fmt, fr, gapReason, get, median, useGet } from '../lib/api'
 import type { MonthRec, RegionDoc } from '../lib/api'
 
@@ -25,15 +27,18 @@ export default function Land() {
   const [box, setBox] = useState<Box>(DEFAULT_BOX.punjab)
   const [inputs, setInputs] = useState(DEFAULT_BOX.punjab.map(String))
   const doc = useGet<RegionDoc>(fr(`/data/v1/regions/${region}.json`))
+  const d = doc.status === 'ready' ? doc.data : null
+  const boxYears = useBoxYears(d, mode === 'box' ? box : null)
+  const { level, hero } = landLevel(d, mode === 'box' ? box : null, boxYears)
   const pick = (r: string) => { setRegion(r); setBox(DEFAULT_BOX[r]); setInputs(DEFAULT_BOX[r].map(String)) }
   const apply = () => { const v = inputs.map(Number); if (v.every(Number.isFinite) && v[0] < v[2] && v[1] < v[3]) setBox(v as Box) }
   return (
     <AppPage id="land" title="Land & loan screening" who="For banks, buyers and supply-chain teams"
       decision="Before a loan, a purchase or a sourcing contract: how often has fire been detected in this area, and were recent years worse than normal?"
       limit="Area-level screening (~36 km² cells): satellite heat detections, not damage, not burned area and not ownership. A box uses the region’s calibration; check on the ground before any decision."
-      open={`/r/${region}`}>
+      open={`/r/${region}`} icon={<TrafficLight level={level} />} picker={<RegionPick value={region} onChange={pick} />}
+      hero={hero} error={doc.status === 'error' ? doc.error : null}>
       <div className="card stack">
-        <RegionPick value={region} onChange={pick} />
         <div className="row">
           <div role="group" aria-label="Area" className="row">
             <button className="btn" aria-pressed={mode === 'region'} onClick={() => setMode('region')} style={mode === 'region' ? { borderColor: 'var(--accent)' } : undefined}>Whole region</button>
@@ -45,19 +50,17 @@ export default function Land() {
           </>)}
         </div>
       </div>
-      {doc.status === 'ready' && <Report doc={doc.data} box={mode === 'box' ? box : null} />}
-      {doc.status === 'loading' && <div className="card muted">Loading from Fire Rings…</div>}
-      {doc.status === 'error' && <div className="card bad">Could not load: {doc.error}</div>}
+      {d && <Report doc={d} box={mode === 'box' ? box : null} boxYears={boxYears} />}
     </AppPage>
   )
 }
 
 interface YearVal { y: number; v: number | null; complete: boolean }
 
-function Report({ doc, box }: { doc: RegionDoc; box: Box | null }) {
+function useBoxYears(doc: RegionDoc | null, box: Box | null) {
   const [boxYears, setBoxYears] = useState<{ years: YearVal[]; cells: number } | 'loading' | null>(null)
   useEffect(() => {
-    if (!box) { setBoxYears(null); return }
+    if (!box || !doc) { setBoxYears(null); return }
     let alive = true
     setBoxYears('loading')
     ;(async () => {
@@ -82,12 +85,13 @@ function Report({ doc, box }: { doc: RegionDoc; box: Box | null }) {
     })().catch(() => alive && setBoxYears(null))
     return () => { alive = false }
   }, [box, doc])
-  const years: YearVal[] | null = useMemo(() => {
-    if (box) return boxYears && boxYears !== 'loading' ? boxYears.years : null
-    return doc.annual.map((a) => ({ y: a.y, v: a.H, complete: !!a.complete && a.rankable !== false }))
-  }, [box, boxYears, doc])
+  return boxYears
+}
+
+type BoxYears = { years: YearVal[]; cells: number } | 'loading' | null
+function landStats(doc: RegionDoc, box: Box | null, boxYears: BoxYears) {
+  const years: YearVal[] | null = box ? (boxYears && boxYears !== 'loading' ? boxYears.years : null) : doc.annual.map((a) => ({ y: a.y, v: a.H, complete: !!a.complete && a.rankable !== false }))
   const name = REGIONS.find((r) => r.id === doc.id)?.name ?? doc.name
-  if (box && boxYears === 'loading') return <div className="card muted">Adding up the hexagons inside the box…</div>
   if (!years) return null
   const full = years.filter((y) => y.complete && y.v != null)
   const lastY = full.length ? full[full.length - 1].y : 0
@@ -97,6 +101,38 @@ function Report({ doc, box }: { doc: RegionDoc; box: Box | null }) {
   const mean10 = last10.reduce((a, y) => a + y.v!, 0) / Math.max(1, last10.length)
   const worst = [...full].sort((a, b) => b.v! - a.v!).slice(0, 3)
   const zeroYears = full.filter((y) => y.v === 0).length
+  return { years, name, full, lastY, last10, normal, mean10, worst, zeroYears }
+}
+
+/** #90 hero wording — "fire history", never a risk or credit score. r = mean fire-days of the last 10 complete years ÷ the
+ *  2003–2022 median year (same numbers as the report below). Thresholds (stated on the card):
+ *    r < 0.8 → "Below normal" · 0.8 ≤ r ≤ 1.2 → "About normal" · r > 1.2 → "Above normal"; normal = 0 → no ratio.
+ *  "Fire history: {level} — last 10 years {r}× normal." The traffic light shows the same level, with the word beside it. */
+type Level = 'below' | 'about' | 'above'
+const LEVEL_WORD: Record<Level, string> = { below: 'Below normal', about: 'About normal', above: 'Above normal' }
+function landLevel(doc: RegionDoc | null, box: Box | null, boxYears: BoxYears): { level: Level | null; hero: Hero | null } {
+  if (!doc) return { level: null, hero: null }
+  const st = landStats(doc, box, boxYears)
+  if (!st || !st.full.length) return { level: null, hero: null }
+  const area = box ? 'this box' : st.name
+  if (!(st.normal > 0)) return { level: null, hero: { answer: <>Fire history: too little fire in {area} to compare with normal.</>, chips: [['Last 10 years', `${fmt(st.mean10)} fire-days/yr`]] } }
+  const r = st.mean10 / st.normal
+  const level: Level = r < 0.8 ? 'below' : r > 1.2 ? 'above' : 'about'
+  return {
+    level,
+    hero: {
+      answer: <>Fire history: <span data-testid="land-level">{LEVEL_WORD[level]}</span> — last 10 years <span className="num" data-testid="hero-r">{r.toFixed(1)}</span>× normal.</>,
+      support: <>{area}, {st.lastY - 9}–{st.lastY} vs the {doc.baseline[0]}–{doc.baseline[1]} median year. Bands: below 0.8× · about 0.8–1.2× · above 1.2×.</>,
+      chips: [['Last 10 years', `${fmt(st.mean10)} fire-days/yr`], ['Normal', `${fmt(st.normal)} fire-days/yr`], ['Worst years', st.worst.map((w) => w.y).join(' · ')]],
+    },
+  }
+}
+
+function Report({ doc, box, boxYears }: { doc: RegionDoc; box: Box | null; boxYears: BoxYears }) {
+  const st = landStats(doc, box, boxYears)
+  if (box && boxYears === 'loading') return <div className="card muted">Adding up the hexagons inside the box…</div>
+  if (!st) return null
+  const { years, name, lastY, normal, mean10, worst, zeroYears } = st
   const area = box ? `box ${box.join(', ')}` : name
   const csv = () => {
     const head = `# Fire Rings Apps · fire history report · ${area} · fire-days (MODIS-equivalent, ~36 km² cells) per year · source ${fr(`/data/v1/regions/${doc.id}.json`)}${box ? ' + hexes' : ''} · screening only: heat detections, not damage or ownership`

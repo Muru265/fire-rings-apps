@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useEffect } from 'react'
-import { APPS } from '../components/Shell'
+import { APPS, useTheme } from '../components/Shell'
+import { ICONS } from '../components/Icons'
 import Inspector from '../components/Inspector'
 import { BASE, FIRE_RINGS, fmt, fr, setPage, useGet } from '../lib/api'
 
@@ -17,6 +18,7 @@ const DESC: Record<string, string> = {
 
 export default function Home() {
   setPage('home')
+  useTheme('home')
   useEffect(() => { document.title = 'Fire Rings Apps — built on the Fire Rings open API' }, [])
   const meta = useGet<Meta>(fr('/data/v1/meta.json'))
   return (
@@ -31,13 +33,22 @@ export default function Home() {
         {meta.status === 'ready' && <p className="small faint" style={{ marginTop: 8 }} data-testid="home-meta">Live from the API: {meta.data.regions.length} regions, {fmt(meta.data.regions.reduce((a, r) => a + r.months, 0))} region-months, data through {meta.data.data_end}.</p>}
       </section>
       <section className="tiles" aria-label="Apps">
-        {APPS.map((a) => (
-          <Link key={a.path} to={a.path} className="card tile" data-testid="app-tile">
-            <p className="eyebrow">{a.n} · {a.who}</p>
-            <h2 style={{ fontSize: 20, marginTop: 6 }}>{a.title}</h2>
-            <p className="small muted" style={{ marginTop: 6 }}>{DESC[a.path]}</p>
-          </Link>
-        ))}
+        {APPS.map((a) => {
+          const Icon = ICONS[a.path]
+          const dark = a.path === '/volcano'
+          // #90: each tile in its app's own colours + icon + the one question it answers (text ≥ 4.5:1 on the tile)
+          return (
+            <Link key={a.path} to={a.path} className="card tile" data-testid="app-tile" title={DESC[a.path]}
+              style={{ background: a.bg, borderColor: a.color, borderWidth: 2, color: dark ? '#F3EDE7' : '#1A1A1A', display: 'grid', gridTemplateColumns: '64px 1fr', gap: 14, alignItems: 'center' }}>
+              <span style={{ width: 64, height: 64 }}><Icon /></span>
+              <span>
+                <span className="eyebrow" style={{ color: dark ? '#CBC1B7' : '#3A3A3A' }}>{a.n} · {a.title}</span>
+                <span style={{ display: 'block', fontFamily: 'var(--display)', fontSize: 19, fontWeight: 700, lineHeight: 1.25, marginTop: 4 }}>{a.q}</span>
+                <span style={{ display: 'block', fontSize: 12.5, marginTop: 4, color: dark ? '#CBC1B7' : '#3A3A3A' }}>For {a.who.toLowerCase()}</span>
+              </span>
+            </Link>
+          )
+        })}
       </section>
       <p className="small faint">Fire detections: NASA FIRMS (MODIS C6.1, VIIRS 375 m) via Fire Rings. Weather: NASA POWER. Imagery: NASA GIBS / Worldview. Eruption dates: Smithsonian Global Volcanism Program. Planning examples, not emergency services; no forecasts.</p>
       <Inspector page="home" />

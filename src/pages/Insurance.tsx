@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import RegionPick from '../components/RegionPick'
 import { AppPage } from '../components/Shell'
-import { EMBED, MONTHS, fmt, fr, quantile, useGet } from '../lib/api'
+import type { Hero } from '../components/Shell'
+import { Shield } from '../components/Icons'
+import { EMBED, MONTHS, REGIONS, fmt, fr, quantile, useGet } from '../lib/api'
 
 type Row = [number, number, number | null, number | null, number | null, number | null, number | null, number | null, string, string]
 interface Series { name: string; baseline: [number, number]; months: Row[]; note: string }
@@ -15,21 +17,18 @@ export default function Insurance() {
     <AppPage id="insurance" title="Fire index for insurance" who="For insurers and disaster funds · parametric index (pays on a measured index, not on loss)"
       decision="Which months would have paid out under a simple “fire-days above the usual” trigger — and would the satellite switch in 2012 have triggered false payouts?"
       limit="Illustrative index only, not an insurance product. Area-level (~36 km² cells), satellite heat detections — heat ≠ damage. Trigger = month above the chosen percentile of the same calendar month in 2003–2022."
-      open={`/r/${region}`}>
+      open={`/r/${region}`} icon={<Shield />} picker={<RegionPick value={region} onChange={setRegion} />}
+      hero={s.status === 'ready' ? insHero(s.data, p, region) : null} error={s.status === 'error' ? s.error : null}>
       <div className="card row">
-        <RegionPick value={region} onChange={setRegion} />
         <label className="f" style={{ minWidth: 260 }}>Trigger: month above the <b className="num" style={{ color: 'var(--text)' }}>{p}th</b> percentile
           <input type="range" min={50} max={99} value={p} onChange={(e) => setP(Number(e.target.value))} aria-label="Trigger percentile" data-testid="ins-slider" /></label>
       </div>
       {s.status === 'ready' && <Body s={s.data} p={p} />}
-      {s.status === 'loading' && <div className="card muted">Loading from Fire Rings…</div>}
-      {s.status === 'error' && <div className="card bad">Could not load: {s.error}</div>}
     </AppPage>
   )
 }
 
-function Body({ s, p }: { s: Series; p: number }) {
-  const r = useMemo(() => {
+function indexOf(s: Series, p: number) {
     const val = { harm: (x: Row) => x[2], raw: (x: Row) => x[5] }
     const thr: Record<'harm' | 'raw', number[]> = { harm: [], raw: [] }
     for (const k of ['harm', 'raw'] as const)
@@ -41,7 +40,24 @@ function Body({ s, p }: { s: Series; p: number }) {
     }))
     const c = (f: (x: typeof cells[number]) => boolean) => cells.filter(f).length
     return { cells, thr, nH: c((x) => x.harm), nR: c((x) => x.raw), rawOnly: c((x) => x.raw && !x.harm && x.y >= 2012), harmOnly: c((x) => x.harm && !x.raw && x.y >= 2012), both: c((x) => x.harm && x.raw) }
-  }, [s, p])
+}
+
+/** #90 hero wording (values recomputed live from api/series/{region}.json and the slider percentile p):
+ *  "With raw satellite data, {x} of {y} payouts would have been triggered by the satellite switch, not by fire."
+ *  x = raw-only payout months from 2012 (raw triggers, harmonized does not); y = all raw payout months, 2003–2025.
+ *  chips: harmonized payouts · raw payouts · missed by raw (harmonized triggers, raw does not, from 2012). */
+function insHero(s: Series, p: number, region: string): Hero {
+  const r = indexOf(s, p)
+  const name = REGIONS.find((x) => x.id === region)?.name ?? s.name
+  return {
+    answer: <>With raw satellite data, <span className="num" data-testid="hero-x">{r.rawOnly}</span> of <span className="num" data-testid="hero-y">{r.nR}</span> payouts would have been triggered by the satellite switch, not by fire.</>,
+    support: <>{name}, {Y0}–{Y1} · trigger: a month above the {p}th percentile of its 2003–2022 values.</>,
+    chips: [['Harmonized payouts', r.nH], ['Raw payouts', r.nR], ['Missed by raw', r.harmOnly]],
+  }
+}
+
+function Body({ s, p }: { s: Series; p: number }) {
+  const r = useMemo(() => indexOf(s, p), [s, p])
   const years = Array.from({ length: Y1 - Y0 + 1 }, (_, i) => Y0 + i)
   const cw = 26, ch = EMBED ? 9 : 14, lx = 40
   return (

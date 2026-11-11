@@ -61,3 +61,77 @@ nav.apps a.active,nav.apps a:hover{background:var(--surface-2);color:var(--text)
 details.insp summary{cursor:pointer}
 @media (max-width:640px){ .card{padding:14px} html,body{font-size:14px} }
 @media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+
+/* ===== Round 5A (#90): one look per app. Tokens per page on html[data-theme]; text ≥ 4.5:1 (checked in scripts/e2e.mjs). ===== */
+:root{ --on-accent:#0A0E14; --serif:Georgia,'Times New Roman',serif; --report:'Segoe UI',system-ui,-apple-system,sans-serif }
+html[data-theme="expect"]{ --bg:#F3EFE0; --surface:#FFFDF6; --surface-2:#EEE8D5; --surface-3:#E2DBC4; --border:#D8D0B6; --border-strong:#B3A985;
+  --text:#1F2A1C; --muted:#3F4C3A; --faint:#4F5C49; --accent:#2F6B3A; --accent-2:#1E5A84; --on-accent:#FFFFFF; --harm:#C2562A; --raw:#8A4F8A;
+  --warn:#7A5200; --ok:#1E6B33; --danger:#A8321E; --hero-a:#E7EFD9; --hero-b:#FFF8E6 }
+html[data-theme="factcheck"]{ --bg:#F4F1EA; --surface:#FBFAF6; --surface-2:#EFEBE1; --surface-3:#E3DDD0; --border:#D6CFC0; --border-strong:#A79F8E;
+  --text:#111111; --muted:#363636; --faint:#4D4840; --accent:#A8231B; --accent-2:#1A4C8C; --on-accent:#FFFFFF; --harm:#2B2B2B; --raw:#8A4F8A;
+  --warn:#7A5200; --ok:#1A6B34; --danger:#A8231B; --display:var(--serif); --hero-a:#FBFAF6; --hero-b:#F4EFE3 }
+html[data-theme="insurance"]{ --bg:#F4F6FA; --surface:#FFFFFF; --surface-2:#EEF1F6; --surface-3:#E1E6EF; --border:#D5DCE7; --border-strong:#A9B5C7;
+  --text:#0F1E3D; --muted:#33436A; --faint:#465473; --accent:#7D600C; --accent-2:#1F3F8F; --on-accent:#FFFFFF; --harm:#1F3F8F; --raw:#A0446F;
+  --warn:#7A5200; --ok:#1E6B33; --danger:#A8321E; --gold:#C9A227; --hero-a:#FFFFFF; --hero-b:#F7F4E8 }
+html[data-theme="smoke"]{ --bg:#D9DBDF; --surface:#F3F2EF; --surface-2:#E7E5E0; --surface-3:#D7D5CF; --border:#C9C6BE; --border-strong:#A6A29A;
+  --text:#202125; --muted:#3E3F44; --faint:#4C4D53; --accent:#9A3C0D; --accent-2:#7E3410; --on-accent:#FFFFFF; --harm:#C8581C; --raw:#8A4F8A;
+  --warn:#6E4A00; --ok:#1E6B33; --danger:#A8321E; --hero-a:#EEF0F2; --hero-b:#F6E3D2 }
+html[data-theme="volcano"]{ --bg:#121014; --surface:#1C1A1F; --surface-2:#26232A; --surface-3:#312D35; --border:#3A353F; --border-strong:#4E4755;
+  --text:#F3EDE7; --muted:#CBC1B7; --faint:#AEA398; --accent:#FF7A2E; --accent-2:#FFB36B; --on-accent:#140C08;
+  --warn:#FFC145; --ok:#4ADE9B; --danger:#FF6B6B; --hero-a:#1C1A1F; --hero-b:#2A1712 }
+html[data-theme="land"]{ --bg:#F6F7F9; --surface:#FFFFFF; --surface-2:#F0F2F5; --surface-3:#E5E8EC; --border:#DADFE5; --border-strong:#B8C0CA;
+  --text:#1C2632; --muted:#3C4855; --faint:#4E5A67; --accent:#2C5A86; --accent-2:#2C5A86; --on-accent:#FFFFFF; --harm:#4A5F78; --raw:#8A4F8A;
+  --warn:#7A5200; --ok:#1E6B33; --danger:#A8321E; --display:var(--report); --hero-a:#FFFFFF; --hero-b:#FFFFFF; --radius:6px }
+html[data-theme] .btn.primary{ color:var(--on-accent) }
+html[data-theme="smoke"]{ background:linear-gradient(180deg,#C9CDD3 0,#D9DBDF 260px,#E6DBD0 100%) fixed }
+/* stars only on the dark pages (home + volcano) */
+html[data-theme="expect"] .stars,html[data-theme="factcheck"] .stars,html[data-theme="insurance"] .stars,html[data-theme="smoke"] .stars,html[data-theme="land"] .stars{ display:none }
+html[data-theme] header.top{ background:color-mix(in srgb,var(--bg) 92%,transparent) }
+html[data-theme="land"] .card{ box-shadow:none; border-radius:6px }
+html[data-theme="land"] .kpi b, html[data-theme="land"] .num{ font-family:var(--mono) }
+
+/* hero answer card */
+.hero{ position:relative; background:linear-gradient(135deg,var(--hero-a),var(--hero-b)); border:1px solid var(--border); border-radius:var(--radius); padding:22px 24px;
+  display:grid; grid-template-columns:auto 1fr; gap:18px 24px; align-items:center }
+.hero .ico{ width:112px; height:112px }
+.hero .ttl{ font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); margin:0; font-weight:500 }
+.hero .ans{ font-family:var(--display); font-size:clamp(23px,3.3vw,36px); line-height:1.15; font-weight:700; color:var(--text); margin-top:6px }
+.hero .sup{ color:var(--muted); margin-top:8px; font-size:15px }
+.hero .chips{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px }
+.chip{ display:inline-flex; gap:6px; align-items:baseline; border:1px solid var(--border-strong); background:var(--surface); border-radius:999px; padding:3px 11px; font-size:12.5px; color:var(--muted) }
+.chip b{ font-family:var(--mono); font-weight:600; color:var(--text) }
+.hero .pick{ grid-column:1 / -1 }
+.hero .openfull{ display:none }
+.showdata{ display:flex; align-items:center; gap:8px; font-weight:600 }
+.foot{ border-top:1px solid var(--border); padding-top:14px }
+html[data-theme="factcheck"] .hero{ border:1px solid #2b2b2b; border-width:3px 1px 1px; border-radius:2px }
+html[data-theme="factcheck"] .hero .ans{ font-weight:700; letter-spacing:-.01em }
+.stamp{ display:inline-block; font-family:var(--mono); font-weight:700; letter-spacing:.08em; text-transform:uppercase; border:3px solid currentColor; border-radius:6px;
+  padding:4px 12px; transform:rotate(-3deg); font-size:clamp(16px,2.2vw,22px); margin-top:10px }
+.stamp.true{ color:var(--ok) } .stamp.notquite{ color:var(--accent) }
+html[data-theme="insurance"] .hero{ border-top:4px solid var(--gold); border-radius:4px }
+html[data-theme="land"] .hero{ border-left:4px solid var(--accent) }
+.light{ display:inline-flex; align-items:center; gap:8px }
+/* volcano lava glow (static under reduced motion) */
+@keyframes lava{ 0%,100%{ opacity:.55 } 50%{ opacity:1 } }
+.lava-glow{ animation:lava 2.8s ease-in-out infinite }
+@media (prefers-reduced-motion: reduce){ .lava-glow{ animation:none; opacity:.85 } }
+@media (max-width:640px){
+  .hero{ grid-template-columns:1fr; padding:16px; gap:10px }
+  .hero .ico{ width:64px; height:64px }
+  .hero .sup{ font-size:14px }
+}
+/* embed (control room): only the hero card, centred, theme background */
+.embed main.app{ min-height:100vh; display:flex; flex-direction:column; justify-content:center; padding:10px }
+.embed .hero{ grid-template-columns:auto 1fr; padding:14px 16px; gap:8px 14px }
+.embed .hero .ico{ width:60px; height:60px }
+.embed .hero .ans{ font-size:clamp(17px,5.2vw,26px) }
+.embed .hero .sup{ font-size:12.5px; margin-top:5px }
+.embed .hero .chips{ margin-top:8px; gap:6px } .embed .chip{ font-size:11px; padding:2px 8px }
+.embed .hero .pick{ display:none }
+.embed .hero .openfull{ display:block; grid-column:1 / -1; font-size:11px; text-align:right }
+html[data-theme] body{ background:transparent }
+.embed .hero .sup{ display:none }
+.embed .chip:nth-child(n+3){ display:none }
+.embed [data-testid="smoke-caveat"]{ font-size:11px; margin-top:4px!important; line-height:1.35 }
+.embed .stamp{ font-size:14px; margin-top:6px }
