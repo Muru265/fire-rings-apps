@@ -135,3 +135,16 @@ html[data-theme] body{ background:transparent }
 .embed .chip:nth-child(n+3){ display:none }
 .embed [data-testid="smoke-caveat"]{ font-size:11px; margin-top:4px!important; line-height:1.35 }
 .embed .stamp{ font-size:14px; margin-top:6px }
+/* control-room window renders the embed at 900×620 and scales it down: make the card big there */
+@media (min-width:700px){
+  .embed main.app{ padding:24px }
+  .embed .hero{ padding:30px 34px; gap:14px 28px; grid-template-columns:auto 1fr }
+  .embed .hero .ico{ width:150px; height:150px }
+  .embed .hero .ttl{ font-size:14px }
+  .embed .hero .ans{ font-size:44px; line-height:1.12 }
+  .embed .hero .sup{ display:block; font-size:19px; margin-top:10px }
+  .embed .chip{ font-size:16px; padding:4px 12px } .embed .chip:nth-child(n+3){ display:inline-flex }
+  .embed .stamp{ font-size:24px }
+  .embed [data-testid="smoke-caveat"]{ font-size:16px }
+  .embed .hero .openfull{ font-size:15px }
+}
