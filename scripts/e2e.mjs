@@ -1,7 +1,7 @@
 // Playwright checks for Fire Rings Apps: every page loads real numbers from the Fire Rings API in normal and embed
 // mode, the inspector shows ≥1 successful call per page, no horizontal scroll at 360 px. Screenshots → screens/.
 // Usage: npm run build && node scripts/e2e.mjs [--screens]
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -67,8 +67,8 @@ try {
   }
 } finally {
   await browser.close()
+  if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(server.pid), '/T', '/F'], { stdio: 'ignore' })
   server.kill()
-  if (process.platform === 'win32') spawn('taskkill', ['/pid', String(server.pid), '/T', '/F'], { stdio: 'ignore' })
 }
 console.log(failed ? `\n${failed} FAILED` : '\nall companion checks passed')
 process.exit(failed ? 1 : 0)

@@ -67,7 +67,7 @@ function Body({ d }: { d: Reunion }) {
             </g>
           ))}
           {Array.from({ length: Math.floor((d1 - d0) / 365.25 / 5) + 1 }, (_, i) => 2001 + i * 5).map((yr) => (
-            <text key={yr} x={x(day(`${yr}-01-01`))} y={2 * LH + 26} fontSize={12} fill="var(--faint)" fontFamily="var(--mono)" textAnchor="middle">{yr}</text>
+            <text key={yr} x={Math.max(22, x(day(`${yr}-01-01`)))} y={2 * LH + 26} fontSize={12} fill="var(--faint)" fontFamily="var(--mono)" textAnchor="middle">{yr}</text>
           ))}
         </svg>
         <p className="tiny faint" style={{ marginTop: 4 }}>{d.coverage}</p>
