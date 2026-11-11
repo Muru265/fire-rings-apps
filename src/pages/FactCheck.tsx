@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import Bars from '../components/Bars'
+import type { Bar } from '../components/Bars'
 import RegionPick from '../components/RegionPick'
 import { AppPage } from '../components/Shell'
-import { MONTHS, REGIONS, fmt, fmt1, fr, median, ord, useGet } from '../lib/api'
+import { MONTHS, REGIONS, fmt, fmt1, fr, gapReason, median, ord, useGet } from '../lib/api'
 import type { RegionDoc } from '../lib/api'
 
 interface Power { source: string; months: [number, number, number, number][]; points: unknown[] }
@@ -43,16 +44,21 @@ function Result({ doc, pow, start, len, year }: { doc: RegionDoc; pow: Power | n
     const by = new Map(doc.months.map((x) => [key(x.y, x.m), x]))
     const ok = (k: number) => { const x = by.get(k); return !!x && x.H != null && x.src !== 'T' && !x.flags.includes('mtd') && !x.flags.includes('insufficient') }
     const seasons: { y: number; total: number; lo: number; hi: number }[] = []
+    const gaps = new Map<number, string>() // #83: seasons skipped for lack of satellite data keep a labelled slot
     const years = [...new Set(doc.months.map((x) => x.y))]
     for (const y of years) {
       const k0 = key(y, start)
       const ks = Array.from({ length: len }, (_, i) => k0 + i)
-      if (!ks.every(ok)) continue
+      if (!ks.every(ok)) {
+        const why = gapReason(ks.map((k) => by.get(k)).filter((x): x is NonNullable<typeof x> => !!x))
+        if (why) gaps.set(y, why)
+        continue
+      }
       seasons.push({ y, total: ks.reduce((a, k) => a + by.get(k)!.H!, 0), lo: ks.reduce((a, k) => a + (by.get(k)!.lo ?? by.get(k)!.H!), 0), hi: ks.reduce((a, k) => a + (by.get(k)!.hi ?? by.get(k)!.H!), 0) })
     }
     const mine = seasons.find((s) => s.y === year) ?? null
     const rank = mine ? 1 + seasons.filter((s) => s.total > mine.total).length : null
-    return { seasons, mine, rank }
+    return { seasons, mine, rank, gaps }
   }, [doc, start, len, year])
   const w = useMemo(() => {
     if (!pow) return null
@@ -93,7 +99,11 @@ function Result({ doc, pow, start, len, year }: { doc: RegionDoc; pow: Power | n
       </section>
       <section className="card">
         <Bars caption={`Every complete ${label.replace(/\d{4}/g, '').replace(/\s+–\s+/, '–').trim()} season, fire-days (MODIS-equivalent)`} unit="fire-days"
-          bars={r.seasons.map((s) => ({ label: String(s.y), value: s.total, color: s.y === year ? 'var(--accent)' : 'var(--harm)', note: s.y === year ? 'selected' : undefined }))} />
+          bars={r.seasons.length ? Array.from({ length: r.seasons[r.seasons.length - 1].y - r.seasons[0].y + 1 }, (_, i) => r.seasons[0].y + i).map((y): Bar => {
+            const s = r.seasons.find((x) => x.y === y)
+            if (s) return { label: String(y), value: s.total, color: y === year ? 'var(--accent)' : 'var(--harm)', note: y === year ? 'selected' : undefined }
+            return { label: String(y), value: null, gap: r.gaps.get(y) ?? 'no complete data for this season' }
+          }) : []} />
       </section>
     </>
   )

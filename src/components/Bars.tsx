@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { fmt } from '../lib/api'
 
-export interface Bar { label: string; value: number | null; color?: string; hollow?: boolean; note?: string }
+/** gap: why this slot has no value (e.g. "not enough satellite data (Jan 2012)") — drawn as an empty hatched slot (#83) */
+export interface Bar { label: string; value: number | null; color?: string; hollow?: boolean; note?: string; gap?: string }
 
 /** Plain SVG bar chart with hover readout and a "View as table" toggle (no chart library). */
 export default function Bars({ bars, height = 180, unit, caption }: { bars: Bar[]; height?: number; unit: string; caption: string }) {
@@ -20,10 +21,24 @@ export default function Bars({ bars, height = 180, unit, caption }: { bars: Bar[
       </div>
       {table ? (
         <div className="scroll" style={{ maxHeight: 260, marginTop: 6 }}><table><thead><tr><th>Period</th><th className="r">{unit}</th><th>Note</th></tr></thead>
-          <tbody>{bars.map((b) => <tr key={b.label}><td className="num">{b.label}</td><td className="num r">{fmt(b.value)}</td><td className="small faint">{b.note ?? ''}</td></tr>)}</tbody></table></div>
+          <tbody>{bars.map((b) => <tr key={b.label}><td className="num">{b.label}</td><td className="num r">{fmt(b.value)}</td><td className="small faint">{b.gap ?? b.note ?? ''}</td></tr>)}</tbody></table></div>
       ) : (
         <svg viewBox={`0 0 ${W} ${height + M}`} width="100%" role="img" aria-label={caption} style={{ display: 'block', marginTop: 6 }} onMouseLeave={() => setHover(null)}>
+          <defs>
+            <pattern id="bar-gap-hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+              <line x1="0" y1="0" x2="0" y2="10" stroke="var(--faint)" strokeWidth="2" />
+            </pattern>
+          </defs>
           {bars.map((b, i) => {
+            if (b.gap) return (
+              <g key={b.label} onMouseEnter={() => setHover(i)} data-testid="bar-gap" data-label={b.label}>
+                <title>{`${b.label}: ${b.gap}`}</title>
+                <rect x={4 + i * bw} y={0} width={bw} height={height} fill="transparent" />
+                <rect x={4 + i * bw + bw * 0.12} y={height * 0.72} width={bw * 0.76} height={height * 0.28} fill="url(#bar-gap-hatch)" stroke="var(--border)" strokeDasharray="4 3" strokeWidth={1.5} />
+                <text x={4 + i * bw + bw / 2} y={height * 0.72 - 6} textAnchor="middle" fontSize={16} fill="var(--faint)" fontFamily="var(--mono)">n/a</text>
+                {i % step === 0 && <text x={4 + i * bw + bw / 2} y={height + 16} textAnchor="middle" fontSize={20} fill="var(--faint)" fontFamily="var(--mono)">{b.label}</text>}
+              </g>
+            )
             const h = b.value == null ? 0 : (b.value / max) * height
             return (
               <g key={b.label} onMouseEnter={() => setHover(i)}>
@@ -37,7 +52,7 @@ export default function Bars({ bars, height = 180, unit, caption }: { bars: Bar[
           })}
         </svg>
       )}
-      <p className="small muted" style={{ minHeight: 20 }} aria-live="polite">{hv ? <><b style={{ color: 'var(--text)' }}>{hv.label}</b> · <span className="num">{fmt(hv.value)}</span> {unit}{hv.note ? ` · ${hv.note}` : ''}</> : 'Hover a bar for its value.'}</p>
+      <p className="small muted" style={{ minHeight: 20 }} aria-live="polite">{hv ? (hv.gap ? <><b style={{ color: 'var(--text)' }}>{hv.label}</b> · {hv.gap}</> : <><b style={{ color: 'var(--text)' }}>{hv.label}</b> · <span className="num">{fmt(hv.value)}</span> {unit}{hv.note ? ` · ${hv.note}` : ''}</>) : 'Hover a bar for its value.'}</p>
     </figure>
   )
 }

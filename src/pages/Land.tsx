@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Bars from '../components/Bars'
 import RegionPick from '../components/RegionPick'
 import { AppPage } from '../components/Shell'
-import { EMBED, REGIONS, fmt, fr, get, median, useGet } from '../lib/api'
+import { EMBED, REGIONS, fmt, fr, gapReason, get, median, useGet } from '../lib/api'
 import type { MonthRec, RegionDoc } from '../lib/api'
 
 type Box = [number, number, number, number]
@@ -122,7 +122,9 @@ function Report({ doc, box }: { doc: RegionDoc; box: Box | null }) {
       </section>
       <section className="card">
         <Bars caption={`Fire-days per year, ${area} (hollow = incomplete year)`} unit="fire-days" height={EMBED ? 110 : 180}
-          bars={years.map((y) => ({ label: String(y.y), value: y.v, hollow: !y.complete, note: y.complete ? undefined : 'incomplete' }))} />
+          bars={years.map((y) => y.v == null
+            ? { label: String(y.y), value: null, gap: gapReason(doc.months.filter((r) => r.y === y.y)) ?? 'no value for this year' } // #83
+            : { label: String(y.y), value: y.v, hollow: !y.complete, note: y.complete ? undefined : 'incomplete' })} />
       </section>
     </>
   )

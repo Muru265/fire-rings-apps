@@ -90,6 +90,11 @@ export function quantile(values: number[], q: number): number {
   return s[lo] + (s[Math.min(lo + 1, s.length - 1)] - s[lo]) * (i - lo)
 }
 export const median = (a: number[]) => quantile(a, 0.5)
+/** #83: why a year/season has no value, from the published month flags — e.g. "not enough satellite data (Jan 2012)" */
+export function gapReason(months: { y: number; m: number; flags: string[] }[]): string | null {
+  const bad = months.filter((r) => r.flags.includes('insufficient'))
+  return bad.length ? `not enough satellite data (${bad.map((r) => `${MONTHS[r.m - 1]} ${r.y}`).join(', ')})` : null
+}
 export const ord = (n: number) => { const s = ['th', 'st', 'nd', 'rd']; const v = n % 100; return `${n}${s[(v - 20) % 10] || s[v] || s[0]}` }
 
 /** Types of the Fire Rings files we read (subset). */

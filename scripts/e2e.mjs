@@ -55,6 +55,20 @@ try {
         if (shots) { await page.waitForTimeout(800); await page.screenshot({ path: resolve(out, `apps_${id}${embed ? '_embed' : ''}_${tag}.png`), fullPage: !embed }) }
       }
     }
+    if (tag === 'desktop') {
+      // #83: a season/year without enough satellite data keeps a labelled hatched slot (axis continuous)
+      for (const [path, label] of [['/factcheck', '2011'], ['/land', '2012']]) {
+        await page.goto(`${base}${path}`, { waitUntil: 'load' })
+        const gap = page.locator(`[data-testid="bar-gap"][data-label="${label}"]`)
+        await gap.waitFor({ timeout: 20000 }).catch(() => {})
+        const t = await gap.locator('title').textContent().catch(() => '')
+        check(`#83 ${path}: hatched slot for ${label} — "${t}"`, /not enough satellite data \(.*Jan 2012/.test(t))
+      }
+      // #88: parametric eyebrow, no company name
+      await page.goto(`${base}/insurance`, { waitUntil: 'load' })
+      const body = await page.locator('body').innerText()
+      check('#88 insurance eyebrow says "parametric index (pays on a measured index, not on loss)", no company name', /parametric index \(pays on a measured index, not on loss\)/i.test(body) && !/floodbase/i.test(body))
+    }
     // inspector "Run again" refetches
     await page.goto(`${base}/expect`, { waitUntil: 'load' })
     await page.locator('[data-testid="api-call"][data-ok="true"]').first().waitFor({ timeout: 20000 })
