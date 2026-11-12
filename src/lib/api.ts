@@ -77,6 +77,9 @@ export const REGIONS = [
   { id: 'madagascar', name: 'Madagascar' },
   { id: 'se_australia', name: 'SE Australia' },
   { id: 'mauritius', name: 'Mauritius' },
+  { id: 'nt_savanna', name: 'Northern Australia savanna' },
+  { id: 'ne_india', name: 'Northeast India' },
+  { id: 'tanzania', name: 'Tanzania' },
 ]
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const nf0 = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 })
