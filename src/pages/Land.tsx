@@ -9,7 +9,9 @@ import { EMBED, REGIONS, fmt, fr, gapReason, get, median, useGet } from '../lib/
 import type { MonthRec, RegionDoc } from '../lib/api'
 
 type Box = [number, number, number, number]
-const DEFAULT_BOX: Record<string, Box> = { punjab: [75.0, 29.8, 76.2, 31.0], madagascar: [46.0, -20.0, 47.0, -19.0], se_australia: [149.0, -36.0, 150.5, -34.5], mauritius: [57.3, -20.5, 57.8, -19.9], nt_savanna: [131.5, -15.0, 133.0, -13.5], ne_india: [91.5, 26.0, 93.0, 27.0], tanzania: [33.0, -8.0, 34.5, -6.5] }
+const DEFAULT_BOX: Record<string, Box> = { punjab: [75.0, 29.8, 76.2, 31.0], madagascar: [46.0, -20.0, 47.0, -19.0], se_australia: [149.0, -36.0, 150.5, -34.5], mauritius: [57.3, -20.5, 57.8, -19.9], nt_savanna: [131.5, -15.0, 133.0, -13.5], ne_india: [91.5, 26.0, 93.0, 27.0], tanzania: [33.0, -8.0, 34.5, -6.5],
+  // Round 8: 1.5° boxes centred on each region's busiest H3 res-3 area in the published hexes (data-driven, not hand-placed)
+  sudan: [23.3, 8.6, 24.8, 10.1], mato_grosso: [-55.1, -11.8, -53.6, -10.3] }
 
 /** Same conversion as the Fire Rings box view: raw cell-days ÷ coverage × the month's published ratio (q, 1, k, k·k′). */
 function factor(doc: RegionDoc, r: MonthRec): number | null {

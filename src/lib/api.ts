@@ -80,6 +80,8 @@ export const REGIONS = [
   { id: 'nt_savanna', name: 'Northern Australia savanna' },
   { id: 'ne_india', name: 'Northeast India' },
   { id: 'tanzania', name: 'Tanzania' },
+  { id: 'sudan', name: 'Sudan' },
+  { id: 'mato_grosso', name: 'Mato Grosso, Brazil' },
 ]
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const nf0 = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 })
